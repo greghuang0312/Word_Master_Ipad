@@ -1,0 +1,4 @@
+interface:
+  display_name: "App Development Workflow"
+  short_description: "Guide full app lifecycle with gated phases and test evidence"
+  default_prompt: "Use $app-development-workflow to run a six-phase app delivery process with approval gates and verifiable test evidence."

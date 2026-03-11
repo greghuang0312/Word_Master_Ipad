@@ -1,0 +1,7 @@
+﻿[2026-03-11T21:12:48.8542209+08:00] Task 01 Step 2 - Attempted command:
+xcodebuild test -scheme WordMaster -destination "platform=iOS Simulator,name=iPad (10th generation)" -only-testing:WordMasterTests/AppRouterTests
+Result: Environment does not provide xcodebuild (CommandNotFoundException).
+
+[2026-03-11T21:12:48.8542209+08:00] Task 01 Step 4 - Re-run command:
+xcodebuild test -scheme WordMaster -destination "platform=iOS Simulator,name=iPad (10th generation)" -only-testing:WordMasterTests/AppRouterTests
+Result: Cannot execute in current environment; CLI evidence is pending manual review.
