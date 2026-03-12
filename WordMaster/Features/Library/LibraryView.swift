@@ -11,11 +11,20 @@ struct LibraryView: View {
         List {
             ForEach(viewModel.words) { word in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(word.enWord)
-                        .font(.headline)
-                    Text(word.zhText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(word.zhText)
+                            .font(.headline)
+                            .lineLimit(2)
+
+                        Spacer(minLength: 8)
+
+                        Text(word.enWord)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
+                    }
+
                     HStack {
                         Label("阶段 \(word.stage)", systemImage: "clock.arrow.circlepath")
                             .font(.caption)

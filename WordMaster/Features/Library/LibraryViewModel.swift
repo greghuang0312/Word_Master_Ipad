@@ -22,7 +22,8 @@ final class LibraryViewModel: ObservableObject {
         defer { loading = false }
 
         do {
-            words = try await context.wordRepository.fetchAllWords(userId: userId)
+            let fetchedWords = try await context.wordRepository.fetchAllWords(userId: userId)
+            words = sortLibraryWords(fetchedWords)
             notice = words.isEmpty ? "词库为空，请先添加词条" : ""
         } catch {
             notice = "加载词库失败：\(error.localizedDescription)"
@@ -41,5 +42,41 @@ final class LibraryViewModel: ObservableObject {
         } catch {
             notice = "删除失败：\(error.localizedDescription)"
         }
+    }
+
+    private func sortLibraryWords(_ words: [WordItem]) -> [WordItem] {
+        words.sorted { lhs, rhs in
+            if lhs.stage != rhs.stage {
+                return lhs.stage < rhs.stage
+            }
+
+            let lhsInitial = chineseInitialSortKey(lhs.zhText)
+            let rhsInitial = chineseInitialSortKey(rhs.zhText)
+            if lhsInitial != rhsInitial {
+                return lhsInitial < rhsInitial
+            }
+
+            if lhs.zhText != rhs.zhText {
+                return lhs.zhText.localizedCompare(rhs.zhText) == .orderedAscending
+            }
+
+            return lhs.enWord.localizedCaseInsensitiveCompare(rhs.enWord) == .orderedAscending
+        }
+    }
+
+    private func chineseInitialSortKey(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let firstChar = trimmed.first else { return "{" }
+
+        let mutable = NSMutableString(string: String(firstChar))
+        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
+        CFStringTransform(mutable, nil, kCFStringTransformStripCombiningMarks, false)
+
+        let transformed = (mutable as String)
+            .uppercased()
+            .filter(\.isLetter)
+
+        guard let initial = transformed.first else { return "{" }
+        return String(initial)
     }
 }
