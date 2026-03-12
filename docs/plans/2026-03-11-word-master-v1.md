@@ -6,6 +6,69 @@
 
 **Architecture:** 采用 SwiftUI + Feature 模块化结构，业务规则（艾宾浩斯调度、状态转移）集中在 Core 层；数据访问通过 Repository 封装 Supabase；候选词通过 DeepSeekClient 获取并支持手写兜底。
 
+### 导入对照架构图（Swift Playgrounds）
+
+```text
+WordMaster/
+├─ WordMasterApp.swift
+├─ App/
+│  ├─ AppContext.swift
+│  ├─ AppRouter.swift
+│  └─ MainTabView.swift
+├─ Core/
+│  ├─ Models/
+│  │  ├─ UserSession.swift
+│  │  └─ WordItem.swift
+│  └─ Review/
+│     └─ ReviewScheduler.swift
+├─ Data/
+│  ├─ Auth/
+│  │  ├─ AuthRepository.swift
+│  │  └─ SupabaseAuthRepository.swift
+│  ├─ LLM/
+│  │  ├─ DeepSeekClient.swift
+│  │  └─ DeepSeekSettings.swift
+│  ├─ Supabase/
+│  │  ├─ SupabaseClientFactory.swift
+│  │  ├─ SupabaseLocalConfig.swift
+│  │  └─ SupabaseSessionStore.swift
+│  └─ Words/
+│     ├─ WordRepository.swift
+│     └─ SupabaseWordRepository.swift
+├─ Features/
+│  ├─ Auth/
+│  │  └─ LoginView.swift
+│  ├─ Add/
+│  │  ├─ AddWordView.swift
+│  │  └─ AddWordViewModel.swift
+│  ├─ Review/
+│  │  ├─ ReviewView.swift
+│  │  └─ ReviewViewModel.swift
+│  ├─ Library/
+│  │  ├─ LibraryView.swift
+│  │  └─ LibraryViewModel.swift
+│  ├─ Stats/
+│  │  ├─ StatsView.swift
+│  │  └─ StatsCalculator.swift
+│  └─ Profile/
+│     ├─ ProfileView.swift
+│     └─ ProfileViewModel.swift
+└─ Shared/
+   └─ Security/
+      └─ KeychainStore.swift
+```
+
+```text
+WordMasterApp
+  -> AppRouter / MainTabView
+  -> AppContext
+      -> AuthRepository (SupabaseAuthRepository)
+      -> WordRepository (SupabaseWordRepository)
+      -> DeepSeekClient
+      -> KeychainStore
+      -> ReviewScheduler
+```
+
 **Tech Stack:** SwiftUI, Swift Concurrency, Supabase Swift, URLSession, Keychain, Postgres(RLS)
 
 ---
