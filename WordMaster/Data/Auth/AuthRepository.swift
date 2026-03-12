@@ -12,7 +12,7 @@ enum AuthRepositoryError: LocalizedError {
         case .missingSupabaseConfig:
             return "缺少 Supabase 配置"
         case .unsupportedInCurrentBuild:
-            return "当前构建不支持 Supabase SDK"
+            return "当前构建不支持 Supabase 接入"
         }
     }
 }
@@ -25,9 +25,10 @@ protocol AuthRepository: AnyObject {
 
 enum AuthRepositoryFactory {
     static func makeDefault() -> AuthRepository {
-        // In Windows dev environment we default to local repository.
-        // On iPad build, replace with SupabaseAuthRepository when SDK/config is ready.
-        InMemoryAuthRepository()
+        if let config = SupabaseClientFactory.loadConfig() {
+            return SupabaseAuthRepository(config: config)
+        }
+        return InMemoryAuthRepository()
     }
 }
 

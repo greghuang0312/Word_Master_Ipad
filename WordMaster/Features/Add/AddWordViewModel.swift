@@ -11,7 +11,6 @@ final class AddWordViewModel: ObservableObject {
     @Published var notice: String = ""
 
     private let context: AppContext
-    private let apiKeyName = "deepseek_api_key"
 
     init(context: AppContext) {
         self.context = context
@@ -24,7 +23,7 @@ final class AddWordViewModel: ObservableObject {
             return
         }
 
-        let apiKey = context.keychainStore.loadString(for: apiKeyName) ?? ""
+        let apiKey = context.keychainStore.loadString(for: DeepSeekSettings.apiKeyName) ?? ""
         guard !apiKey.isEmpty else {
             notice = "未配置 API Key，仍可手写英文后保存"
             candidates = []

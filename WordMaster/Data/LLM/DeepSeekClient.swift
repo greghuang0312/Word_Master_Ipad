@@ -42,7 +42,7 @@ final class DeepSeekClient: DeepSeekClientProtocol {
         中文输入：\(zhText)
         """
         let payload = DeepSeekRequest(
-            model: "deepseek-chat",
+            model: DeepSeekSettings.defaultModel,
             messages: [
                 DeepSeekMessage(role: "system", content: "You are a concise bilingual vocabulary assistant."),
                 DeepSeekMessage(role: "user", content: prompt)

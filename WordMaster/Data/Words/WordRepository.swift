@@ -21,9 +21,10 @@ protocol WordRepository: AnyObject {
 
 enum WordRepositoryFactory {
     static func makeDefault() -> WordRepository {
-        // Dev fallback repository.
-        // iPad production build can switch to Supabase-backed implementation.
-        InMemoryWordRepository()
+        if let config = SupabaseClientFactory.loadConfig() {
+            return SupabaseWordRepository(config: config)
+        }
+        return InMemoryWordRepository()
     }
 }
 

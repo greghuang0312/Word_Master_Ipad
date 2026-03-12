@@ -1,6 +1,6 @@
 # Word Master - Supabase 配置指南
 
-更新时间：2026-03-11  
+更新时间：2026-03-12  
 适用范围：Word Master V1（iPadOS，账号密码登录，不开放注册）
 
 ## 1. 创建项目
@@ -181,10 +181,24 @@ with check ((select auth.uid()) = user_id);
 
 ## 9. 上线前核对清单
 
-1. [ ] 公开注册已关闭
-2. [ ] 学生账号已预创建
-3. [ ] 三张表与索引已创建
-4. [ ] RLS 策略已启用并验证
-5. [ ] 客户端仅持有 `anon key`
-6. [ ] `service_role key` 未进入客户端包体
-7. [ ] 随机抽测 2 个账号，验证互相不可见
+1. [x] 公开注册已关闭
+2. [x] 学生账号已预创建
+3. [x] 三张表与索引已创建
+4. [x] RLS 策略已启用并验证
+5. [x] 客户端仅持有 `anon key`
+6. [x] `service_role key` 未进入客户端包体
+7. [x] 随机抽测 2 个账号，验证互相不可见
+
+## 10. 收尾验收记录（2026-03-12）
+
+1. Schema/Index/Trigger 验收通过：
+   - `words`、`review_logs`、`user_settings` 三张表存在
+   - 索引与唯一约束存在：`idx_words_user_review_date`、`idx_words_user_stage`、`idx_logs_user_reviewed_at`、`words_user_id_en_word_key`
+   - 触发器存在：`trg_words_set_updated_at`、`trg_user_settings_set_updated_at`
+2. RLS Policy 验收通过：
+   - 三张表共 9 条策略，角色均为 `authenticated`
+3. 用户隔离自动化验收通过：
+   - 使用 `scripts/run-rls-check.cmd`
+   - 结果：`A reads B count: 0`、`B reads A count: 0`、`PASS`
+4. 审计 SQL：
+   - `docs/sql/step-01-final-audit.sql`

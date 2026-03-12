@@ -9,7 +9,7 @@
 1. [x] 测试报告文档已完成（`docs/testing-report.md`，人工签核通过）
 2. [x] 配置与环境变量清单已整理（`docs/supabase-setup.md`）
 3. [x] 回滚步骤已记录（见本文第 2 节）
-4. [ ] 真实 Supabase 项目联通与权限复核（需 iPad 侧实机验证）
+4. [x] 真实 Supabase 项目联通与权限复核（2026-03-12 已完成：Schema/RLS/隔离自动化验收通过）
 5. [ ] iPad 冒烟测试 3-5 条（需 iPad 侧执行并回填）
 
 ## 2. 回滚步骤（Rollback）

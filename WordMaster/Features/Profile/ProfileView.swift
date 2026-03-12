@@ -20,6 +20,16 @@ struct ProfileView: View {
                     .autocorrectionDisabled()
                 HStack {
                     Button("保存") { viewModel.saveApiKey() }
+                    Button {
+                        Task { await viewModel.testApiKey() }
+                    } label: {
+                        if viewModel.testing {
+                            ProgressView()
+                        } else {
+                            Text("测试")
+                        }
+                    }
+                    .disabled(viewModel.testing)
                     Button("清除", role: .destructive) { viewModel.clearApiKey() }
                 }
             }
