@@ -4,13 +4,20 @@ import Combine
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published private(set) var words: [WordItem] = []
+    @Published private(set) var deletingWordIds: Set<UUID> = []
     @Published var notice: String = ""
     @Published var loading = false
+    @Published var feedbackMessage: String?
 
     private let context: AppContext
+    private var feedbackDismissTask: Task<Void, Never>?
 
     init(context: AppContext) {
         self.context = context
+    }
+
+    deinit {
+        feedbackDismissTask?.cancel()
     }
 
     func loadWords() async {
@@ -27,20 +34,50 @@ final class LibraryViewModel: ObservableObject {
             notice = words.isEmpty ? "词库为空，请先添加词条" : ""
         } catch {
             notice = "加载词库失败：\(error.localizedDescription)"
+            showFeedback(notice)
         }
     }
 
     func deleteWord(at offsets: IndexSet) async {
-        guard let userId = context.currentUserId else { return }
+        let ids = offsets.compactMap { index in
+            words.indices.contains(index) ? words[index].id : nil
+        }
+
+        for id in ids {
+            await deleteWord(id: id)
+        }
+    }
+
+    func deleteWord(id: UUID) async {
+        guard let userId = context.currentUserId else {
+            notice = "请先登录"
+            showFeedback(notice)
+            return
+        }
+        guard !deletingWordIds.contains(id) else { return }
+
+        deletingWordIds.insert(id)
+        defer { deletingWordIds.remove(id) }
+
         do {
-            for offset in offsets {
-                let id = words[offset].id
-                try await context.wordRepository.deleteWord(userId: userId, wordId: id)
-            }
-            words.remove(atOffsets: offsets)
-            notice = "删除成功"
+            try await context.wordRepository.deleteWord(userId: userId, wordId: id)
+            words.removeAll { $0.id == id }
+            notice = words.isEmpty ? "词库为空，请先添加词条" : ""
+            showFeedback("删除成功")
         } catch {
             notice = "删除失败：\(error.localizedDescription)"
+            showFeedback(notice)
+        }
+    }
+
+    private func showFeedback(_ message: String) {
+        feedbackDismissTask?.cancel()
+        feedbackMessage = message
+
+        feedbackDismissTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.feedbackMessage = nil
         }
     }
 

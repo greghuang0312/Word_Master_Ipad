@@ -3,6 +3,7 @@ import SwiftUI
 struct StatsView: View {
     @State private var words: [WordItem] = []
     @State private var notice = ""
+    @State private var loading = false
 
     private let context: AppContext
     private let calculator = StatsCalculator()
@@ -15,22 +16,31 @@ struct StatsView: View {
         let result = calculator.calculate(words: words)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                summaryGrid(result.summary)
+            VStack(alignment: .leading, spacing: 14) {
+                if loading {
+                    ProgressView("正在加载统计数据...")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+
+                summarySection(result.summary)
                 distributionSection(result.distribution)
                 timelineSection(result.timeline)
                 rulesSection
 
                 if !notice.isEmpty {
-                    Text(notice)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    noticeSection(notice)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 28)
         }
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("统计")
         .task { await loadWords() }
+        .refreshable { await loadWords() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("刷新") { Task { await loadWords() } }
@@ -38,13 +48,20 @@ struct StatsView: View {
         }
     }
 
-    private func summaryGrid(_ summary: StatsSummary) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            statCard("总单词量", "\(summary.total)", color: .blue)
-            statCard("进行中", "\(summary.inProgress)", color: .orange)
-            statCard("逾期", "\(summary.overdue)", color: .red)
-            statCard("已掌握", "\(summary.mastered)", color: .green)
+    private func summarySection(_ summary: StatsSummary) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("学习总览")
+                .font(.headline)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                statCard("总单词量", "\(summary.total)", color: .blue)
+                statCard("进行中", "\(summary.inProgress)", color: .orange)
+                statCard("逾期", "\(summary.overdue)", color: .red)
+                statCard("已掌握", "\(summary.mastered)", color: .green)
+            }
         }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func statCard(_ title: String, _ value: String, color: Color) -> some View {
@@ -53,34 +70,40 @@ struct StatsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.title2)
-                .bold()
+                .font(.title2.weight(.bold))
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func distributionSection(_ distribution: [StageDistributionItem]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("阶段分布")
                 .font(.headline)
+
             ForEach(distribution) { item in
                 HStack {
-                    Text("阶段 \(item.stage)")
+                    Label("阶段 \(item.stage)", systemImage: "circle.fill")
+                        .foregroundStyle(stageColor(item.stage))
                     Spacer()
                     Text("\(item.count)")
                         .foregroundStyle(.secondary)
                 }
+                .font(.subheadline)
+                .padding(.vertical, 4)
             }
         }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func timelineSection(_ timeline: [TimelineItem]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("艾宾浩斯复习时间轴")
                 .font(.headline)
+
             ForEach(timeline) { item in
                 HStack {
                     Text("阶段 \(item.stage)")
@@ -88,8 +111,12 @@ struct StatsView: View {
                     Text("+\(item.daysAfterReview) 天")
                         .foregroundStyle(.secondary)
                 }
+                .font(.subheadline)
+                .padding(.vertical, 4)
             }
         }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var rulesSection: some View {
@@ -103,6 +130,28 @@ struct StatsView: View {
         }
         .font(.footnote)
         .foregroundStyle(.secondary)
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func noticeSection(_ text: String) -> some View {
+        Label(text, systemImage: "info.circle")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func stageColor(_ stage: Int) -> Color {
+        switch stage {
+        case 1: return .red
+        case 2: return .orange
+        case 3: return .yellow
+        case 4: return .mint
+        case 5: return .blue
+        default: return .purple
+        }
     }
 
     private func loadWords() async {
@@ -111,6 +160,10 @@ struct StatsView: View {
             words = []
             return
         }
+
+        loading = true
+        defer { loading = false }
+
         do {
             words = try await context.wordRepository.fetchAllWords(userId: userId)
             notice = words.isEmpty ? "暂无统计数据" : ""
@@ -119,4 +172,3 @@ struct StatsView: View {
         }
     }
 }
-
