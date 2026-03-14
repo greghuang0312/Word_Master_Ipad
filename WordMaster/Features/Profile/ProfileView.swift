@@ -17,64 +17,41 @@ struct ProfileView: View {
                 }
 
                 Section("DeepSeek API Key") {
-                    SecureField("请输入 API Key", text: $viewModel.apiKey)
+                    TextField("请输入 API Key", text: $viewModel.apiKey)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
                     HStack(spacing: 8) {
                         Image(systemName: viewModel.hasSavedApiKey ? "checkmark.seal.fill" : "exclamationmark.triangle")
                             .foregroundStyle(viewModel.hasSavedApiKey ? .green : .orange)
-                        Text(viewModel.hasSavedApiKey ? "当前已保存可用 API Key" : "当前尚未保存 API Key")
+                        Text(ProfileApiKeyGuidance.statusText(hasSavedApiKey: viewModel.hasSavedApiKey))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
-                    VStack(spacing: 10) {
-                        HStack(spacing: 10) {
-                            Button("保存") {
-                                viewModel.saveApiKey()
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await viewModel.testAndSaveApiKey() }
+                        } label: {
+                            if viewModel.testing {
+                                ProgressView()
+                            } else {
+                                Text("测试并保存")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .disabled(trimmedApiKey.isEmpty)
-
-                            Button {
-                                Task { await viewModel.testApiKey() }
-                            } label: {
-                                if viewModel.testing {
-                                    ProgressView()
-                                } else {
-                                    Text("测试连接")
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .disabled(viewModel.testing)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .disabled(viewModel.testing || trimmedApiKey.isEmpty)
 
-                        HStack(spacing: 10) {
-                            Button {
-                                Task { await viewModel.testAndSaveApiKey() }
-                            } label: {
-                                if viewModel.testing {
-                                    ProgressView()
-                                } else {
-                                    Text("测试并保存")
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .disabled(viewModel.testing || trimmedApiKey.isEmpty)
-
-                            Button("清除", role: .destructive) {
-                                viewModel.clearApiKey()
-                            }
-                            .buttonStyle(.bordered)
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                        Button("清除", role: .destructive) {
+                            viewModel.clearApiKey()
                         }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .disabled(viewModel.testing || (!viewModel.hasSavedApiKey && trimmedApiKey.isEmpty))
                     }
 
-                    Text("点击“测试连接”或“测试并保存”成功后，都会自动保存 API。")
+                    Text(ProfileApiKeyGuidance.helperText)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -95,8 +72,8 @@ struct ProfileView: View {
             }
             .navigationTitle("我的")
 
-            if let message = viewModel.resultBannerMessage {
-                resultBanner(message)
+            if let banner = viewModel.resultBanner {
+                resultBanner(banner)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .offset(y: -120)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -105,7 +82,7 @@ struct ProfileView: View {
         }
         .animation(
             reduceMotion ? .none : .spring(response: 0.32, dampingFraction: 0.88),
-            value: viewModel.resultBannerMessage != nil
+            value: viewModel.resultBanner != nil
         )
     }
 
@@ -113,11 +90,11 @@ struct ProfileView: View {
         viewModel.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func resultBanner(_ text: String) -> some View {
+    private func resultBanner(_ banner: ProfileResultBanner) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(text)
+            Image(systemName: banner.tone.iconSystemName)
+                .foregroundStyle(banner.tone == .error ? .red : .green)
+            Text(banner.message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
         }

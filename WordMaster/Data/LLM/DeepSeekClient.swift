@@ -13,12 +13,30 @@ enum DeepSeekClientError: LocalizedError {
         case .invalidResponse:
             return "DeepSeek 返回格式异常"
         case let .requestFailed(statusCode, message):
+            if let friendly = friendlyMessage(for: statusCode) {
+                let detail = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                return detail.isEmpty ? friendly : "\(friendly)（\(detail)）"
+            }
+
             if message.isEmpty {
                 return "DeepSeek 请求失败（HTTP \(statusCode)）"
             }
             return "DeepSeek 请求失败（HTTP \(statusCode)）：\(message)"
         case let .networkFailure(underlying):
             return "连接 DeepSeek 失败：\(underlying.localizedDescription)"
+        }
+    }
+
+    private func friendlyMessage(for statusCode: Int) -> String? {
+        switch statusCode {
+        case 401:
+            return "DeepSeek API Key 无效或已失效"
+        case 402:
+            return "DeepSeek 账户余额不足"
+        case 429:
+            return "DeepSeek 请求过于频繁，请稍后再试"
+        default:
+            return nil
         }
     }
 }
@@ -102,7 +120,7 @@ final class DeepSeekClient: DeepSeekClientProtocol {
             return normalize(array)
         }
 
-        // Fallback: split lines/commas if model didn't return strict JSON.
+        // Fallback when the model does not return strict JSON.
         let separators = CharacterSet(charactersIn: ",\n;|")
         let rough = cleaned
             .replacingOccurrences(of: "[", with: "")

@@ -4,6 +4,7 @@ struct LibraryView: View {
     @StateObject private var viewModel: LibraryViewModel
     @State private var pendingDeletion: WordItem?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let isActive: Bool
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -12,19 +13,15 @@ struct LibraryView: View {
         return formatter
     }()
 
-    init(context: AppContext) {
+    init(context: AppContext, isActive: Bool) {
         _viewModel = StateObject(wrappedValue: LibraryViewModel(context: context))
+        self.isActive = isActive
     }
 
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    if viewModel.loading {
-                        ProgressView("正在加载词库...")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
                     if !viewModel.notice.isEmpty {
                         noticeView(viewModel.notice)
                     }
@@ -50,6 +47,7 @@ struct LibraryView: View {
                 .padding(.bottom, 28)
             }
             .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .blur(radius: (pendingDeletion != nil || viewModel.loading) ? 1.5 : 0)
 
             if let message = viewModel.feedbackMessage {
                 feedbackBanner(message)
@@ -58,40 +56,36 @@ struct LibraryView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     .zIndex(1)
             }
+
+            if viewModel.loading {
+                syncOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .zIndex(2)
+            }
+
+            if let word = pendingDeletion {
+                deletionDialog(for: word)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .zIndex(3)
+            }
         }
         .animation(
             reduceMotion ? .none : .spring(response: 0.32, dampingFraction: 0.88),
             value: viewModel.feedbackMessage != nil
         )
+        .animation(
+            reduceMotion ? .none : .spring(response: 0.26, dampingFraction: 0.9),
+            value: pendingDeletion != nil
+        )
         .navigationTitle("库")
-        .task { await viewModel.loadWords() }
+        .task(id: isActive) {
+            guard isActive else { return }
+            await viewModel.loadWords()
+        }
         .refreshable { await viewModel.loadWords() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("刷新") { Task { await viewModel.loadWords() } }
-            }
-        }
-        .confirmationDialog(
-            "删除词条",
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let word = pendingDeletion {
-                Button("删除“\(word.enWord)”", role: .destructive) {
-                    let wordId = word.id
-                    pendingDeletion = nil
-                    Task { await viewModel.deleteWord(id: wordId) }
-                }
-            }
-            Button("取消", role: .cancel) {
-                pendingDeletion = nil
-            }
-        } message: {
-            if let word = pendingDeletion {
-                Text("删除后不可恢复，确认删除“\(word.zhText) / \(word.enWord)”吗？")
             }
         }
     }
@@ -141,9 +135,12 @@ struct LibraryView: View {
                     .padding(.vertical, 6)
                     .background(.blue.opacity(0.12), in: Capsule())
 
-                Label(word.isMastered ? "已掌握" : "进行中", systemImage: word.isMastered ? "checkmark.seal.fill" : "circle.dotted")
-                    .font(.caption)
-                    .foregroundStyle(word.isMastered ? .green : .orange)
+                Label(
+                    word.isMastered ? "已掌握" : "进行中",
+                    systemImage: word.isMastered ? "checkmark.seal.fill" : "circle.dotted"
+                )
+                .font(.caption)
+                .foregroundStyle(word.isMastered ? .green : .orange)
 
                 Spacer()
 
@@ -154,6 +151,81 @@ struct LibraryView: View {
         }
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func deletionDialog(for word: WordItem) -> some View {
+        let prompt = LibraryDeletionPrompt(word: word)
+
+        return ZStack {
+            Color.black.opacity(0.18)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    pendingDeletion = nil
+                }
+
+            VStack(alignment: .leading, spacing: 16) {
+                Label(prompt.title, systemImage: "trash.fill")
+                    .font(.headline)
+                    .foregroundStyle(.red)
+
+                Text(prompt.message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 12) {
+                    Button("取消") {
+                        pendingDeletion = nil
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+
+                    Button(prompt.confirmTitle, role: .destructive) {
+                        let wordId = word.id
+                        pendingDeletion = nil
+                        Task { await viewModel.deleteWord(id: wordId) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 320, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(.white.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 12)
+            .padding(.horizontal, 24)
+            .offset(y: -96)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var syncOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.14)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("正在同步数据")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        }
     }
 
     private func noticeView(_ text: String) -> some View {

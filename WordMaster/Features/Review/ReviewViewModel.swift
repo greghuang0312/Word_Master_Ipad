@@ -27,9 +27,13 @@ final class ReviewViewModel: ObservableObject {
 
     func loadQueue(today: Date = Date()) async {
         guard let userId = context.currentUserId else {
+            queue = []
+            currentIndex = 0
+            showEnglish = false
             notice = "请先登录"
             return
         }
+
         loading = true
         defer { loading = false }
 

@@ -7,15 +7,15 @@ final class ProfileViewModel: ObservableObject {
     @Published var notice: String = ""
     @Published var testing = false
     @Published private(set) var hasSavedApiKey = false
-    @Published var resultBannerMessage: String?
+    @Published var resultBanner: ProfileResultBanner?
 
     private let context: AppContext
     private var resultDismissTask: Task<Void, Never>?
 
     init(context: AppContext) {
         self.context = context
-        self.apiKey = context.keychainStore.loadString(for: DeepSeekSettings.apiKeyName) ?? ""
-        self.hasSavedApiKey = !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let savedKey = context.keychainStore.loadString(for: DeepSeekSettings.apiKeyName) ?? ""
+        self.hasSavedApiKey = !savedKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     deinit {
@@ -26,21 +26,6 @@ final class ProfileViewModel: ObservableObject {
         context.session?.email ?? "未登录"
     }
 
-    func saveApiKey() {
-        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            showResult("API Key 不能为空")
-            return
-        }
-
-        do {
-            try persistApiKey(trimmed)
-            showResult("API Key 保存成功")
-        } catch {
-            showResult("保存失败：\(error.localizedDescription)")
-        }
-    }
-
     func clearApiKey() {
         context.keychainStore.deleteValue(for: DeepSeekSettings.apiKeyName)
         apiKey = ""
@@ -48,40 +33,10 @@ final class ProfileViewModel: ObservableObject {
         showResult("API Key 已清除")
     }
 
-    func testApiKey() async {
-        let typed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let saved = context.keychainStore.loadString(for: DeepSeekSettings.apiKeyName)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        let keyToTest: String
-        if !typed.isEmpty {
-            keyToTest = typed
-        } else if !saved.isEmpty {
-            keyToTest = saved
-            apiKey = saved
-        } else {
-            showResult("请先输入 API Key")
-            return
-        }
-
-        testing = true
-        defer { testing = false }
-
-        do {
-            _ = try await context.deepSeekClient.generateCandidates(
-                for: DeepSeekSettings.connectivityProbeText,
-                apiKey: keyToTest
-            )
-            try persistApiKey(keyToTest)
-            showResult("测试成功，已保存API")
-        } catch {
-            showResult("测试错误")
-        }
-    }
-
     func testAndSaveApiKey() async {
         let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            showResult("请先输入 API Key")
+            showResult("请输入 API Key", tone: .error)
             return
         }
 
@@ -94,9 +49,10 @@ final class ProfileViewModel: ObservableObject {
                 apiKey: trimmed
             )
             try persistApiKey(trimmed)
-            showResult("测试成功，已保存API")
+            apiKey = ""
+            showResult("测试成功，已保存 API")
         } catch {
-            showResult("测试错误")
+            showResult(error.localizedDescription, tone: .error)
         }
     }
 
@@ -114,19 +70,18 @@ final class ProfileViewModel: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "写入后校验失败，请重试"]
             )
         }
-        apiKey = key
         hasSavedApiKey = true
     }
 
-    private func showResult(_ message: String) {
+    private func showResult(_ message: String, tone: ProfileResultBanner.Tone = .success) {
         notice = message
         resultDismissTask?.cancel()
-        resultBannerMessage = message
+        resultBanner = ProfileResultBanner(message: message, tone: tone)
 
         resultDismissTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
-            self?.resultBannerMessage = nil
+            self?.resultBanner = nil
         }
     }
 }

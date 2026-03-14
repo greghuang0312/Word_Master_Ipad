@@ -31,8 +31,8 @@ struct AddWordView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
 
-            if let message = viewModel.completionMessage {
-                completionBanner(message)
+            if let banner = viewModel.resultBanner {
+                resultBanner(banner)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     .offset(y: -120)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -41,7 +41,7 @@ struct AddWordView: View {
         }
         .animation(
             reduceMotion ? .none : .spring(response: 0.32, dampingFraction: 0.88),
-            value: viewModel.completionMessage != nil
+            value: viewModel.resultBanner != nil
         )
         .navigationTitle("添加")
     }
@@ -53,26 +53,16 @@ struct AddWordView: View {
 
             TextField("例如：苹果", text: $viewModel.zhText)
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: viewModel.zhText) { _, _ in
-                    viewModel.scheduleAutoQuery()
-                }
 
-            Button {
-                Task { await viewModel.queryCandidates() }
-            } label: {
+            if viewModel.loading {
                 HStack(spacing: 8) {
-                    if viewModel.loading {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "sparkles")
-                    }
-                    Text(viewModel.loading ? "查询中..." : "手动重查（可选）")
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("正在查询候选词...")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.loading)
         }
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -112,17 +102,22 @@ struct AddWordView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .buttonStyle(.borderedProminent)
+            .disabled(viewModel.saving)
 
             Button("清空") {
                 viewModel.resetInput()
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .buttonStyle(.bordered)
+            .disabled(viewModel.saving)
         }
     }
 
     private func candidateRow(_ candidate: String) -> some View {
         let isSelected = viewModel.selectedCandidate == candidate
+        let backgroundStyle: AnyShapeStyle = isSelected
+            ? AnyShapeStyle(Color.blue.opacity(0.12))
+            : AnyShapeStyle(.ultraThinMaterial)
 
         return Button {
             viewModel.selectedCandidate = candidate
@@ -140,7 +135,7 @@ struct AddWordView: View {
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                isSelected ? .blue.opacity(0.12) : .ultraThinMaterial,
+                backgroundStyle,
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
         }
@@ -156,11 +151,21 @@ struct AddWordView: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func completionBanner(_ text: String) -> some View {
+    private func resultBanner(_ banner: AddWordResultBanner) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(text)
+            switch banner.tone {
+            case .progress:
+                ProgressView()
+                    .controlSize(.small)
+            case .success:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case .error:
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+            }
+
+            Text(banner.message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
         }

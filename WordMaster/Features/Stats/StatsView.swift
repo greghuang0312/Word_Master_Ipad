@@ -7,39 +7,45 @@ struct StatsView: View {
 
     private let context: AppContext
     private let calculator = StatsCalculator()
+    private let isActive: Bool
 
-    init(context: AppContext) {
+    init(context: AppContext, isActive: Bool) {
         self.context = context
+        self.isActive = isActive
     }
 
     var body: some View {
         let result = calculator.calculate(words: words)
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if loading {
-                    ProgressView("正在加载统计数据...")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    summarySection(result.summary)
+                    distributionSection(result.distribution)
+                    timelineSection(result.timeline)
+                    rulesSection
 
-                summarySection(result.summary)
-                distributionSection(result.distribution)
-                timelineSection(result.timeline)
-                rulesSection
-
-                if !notice.isEmpty {
-                    noticeSection(notice)
+                    if !notice.isEmpty {
+                        noticeSection(notice)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 28)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .blur(radius: loading ? 1.5 : 0)
+
+            if loading {
+                syncOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
         }
-        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("统计")
-        .task { await loadWords() }
+        .task(id: isActive) {
+            guard isActive else { return }
+            await loadWords()
+        }
         .refreshable { await loadWords() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -132,6 +138,29 @@ struct StatsView: View {
         .foregroundStyle(.secondary)
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var syncOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.14)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("正在同步数据")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        }
     }
 
     private func noticeSection(_ text: String) -> some View {

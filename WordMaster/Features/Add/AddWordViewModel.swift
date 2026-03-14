@@ -1,26 +1,30 @@
 import Foundation
-import Combine
 
 @MainActor
 final class AddWordViewModel: ObservableObject {
-    @Published var zhText: String = ""
+    @Published var zhText: String = "" {
+        didSet { scheduleAutoQuery() }
+    }
     @Published var candidates: [String] = []
     @Published var selectedCandidate: String?
     @Published var manualEnglish: String = ""
     @Published var loading = false
+    @Published var saving = false
     @Published var notice: String = ""
-    @Published var completionMessage: String?
+    @Published var resultBanner: AddWordResultBanner?
 
     private let context: AppContext
-    private var completionDismissTask: Task<Void, Never>?
+    private let autoQueryDelayNanoseconds: UInt64
+    private var resultDismissTask: Task<Void, Never>?
     private var autoQueryTask: Task<Void, Never>?
 
-    init(context: AppContext) {
+    init(context: AppContext, autoQueryDelayNanoseconds: UInt64 = 600_000_000) {
         self.context = context
+        self.autoQueryDelayNanoseconds = autoQueryDelayNanoseconds
     }
 
     deinit {
-        completionDismissTask?.cancel()
+        resultDismissTask?.cancel()
         autoQueryTask?.cancel()
     }
 
@@ -36,9 +40,10 @@ final class AddWordViewModel: ObservableObject {
         }
 
         autoQueryTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: self.autoQueryDelayNanoseconds)
             guard !Task.isCancelled else { return }
-            await self?.queryCandidates(autoTriggered: true)
+            await self.queryCandidates(autoTriggered: true)
         }
     }
 
@@ -85,7 +90,7 @@ final class AddWordViewModel: ObservableObject {
 
     func save(today: Date = Date()) async {
         guard let userId = context.currentUserId else {
-            notice = "请先登录"
+            await context.signOut()
             return
         }
 
@@ -103,6 +108,10 @@ final class AddWordViewModel: ObservableObject {
             return
         }
 
+        saving = true
+        showResult("正在保存", tone: .progress, autoDismiss: false)
+        defer { saving = false }
+
         do {
             let result = try await context.wordRepository.upsertWord(
                 userId: userId,
@@ -111,14 +120,23 @@ final class AddWordViewModel: ObservableObject {
                 today: today
             )
             notice = result.merged ? "英文重复，已合并并重置到阶段 1" : ""
-            resetInput(keepNotice: true)
-            showCompletionPopup("已经添加完成")
+            resetInput(keepNotice: true, keepBanner: true)
+            showResult("已经添加完成", tone: .success)
         } catch {
-            notice = "保存失败：\(error.localizedDescription)"
+            if let repositoryError = error as? WordRepositoryError,
+               case .missingSession = repositoryError {
+                resultBanner = nil
+                await context.signOut()
+                return
+            }
+
+            let message = "保存失败：\(error.localizedDescription)"
+            notice = message
+            showResult(message, tone: .error)
         }
     }
 
-    func resetInput(keepNotice: Bool = false) {
+    func resetInput(keepNotice: Bool = false, keepBanner: Bool = false) {
         autoQueryTask?.cancel()
         zhText = ""
         candidates = []
@@ -126,16 +144,22 @@ final class AddWordViewModel: ObservableObject {
         manualEnglish = ""
         loading = false
         if !keepNotice { notice = "" }
+        if !keepBanner {
+            resultDismissTask?.cancel()
+            resultBanner = nil
+        }
     }
 
-    private func showCompletionPopup(_ message: String) {
-        completionDismissTask?.cancel()
-        completionMessage = message
+    private func showResult(_ message: String, tone: AddWordResultBanner.Tone, autoDismiss: Bool = true) {
+        resultDismissTask?.cancel()
+        resultBanner = AddWordResultBanner(message: message, tone: tone)
 
-        completionDismissTask = Task { [weak self] in
+        guard autoDismiss else { return }
+
+        resultDismissTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
-            self?.completionMessage = nil
+            self?.resultBanner = nil
         }
     }
 }

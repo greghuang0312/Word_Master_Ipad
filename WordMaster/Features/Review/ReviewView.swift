@@ -2,44 +2,46 @@ import SwiftUI
 
 struct ReviewView: View {
     @StateObject private var viewModel: ReviewViewModel
+    private let isActive: Bool
 
-    init(context: AppContext) {
+    init(context: AppContext, isActive: Bool) {
         _viewModel = StateObject(wrappedValue: ReviewViewModel(context: context))
+        self.isActive = isActive
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                headerCard
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    headerCard
 
-                if viewModel.loading {
-                    ProgressView("正在加载今日复习队列...")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                } else if let word = viewModel.currentWord {
-                    card(for: word)
-                    actionBar
-                } else {
-                    emptyState
-                }
+                    if let word = viewModel.currentWord {
+                        card(for: word)
+                        actionBar
+                    } else {
+                        emptyState
+                    }
 
-                if !viewModel.notice.isEmpty {
-                    noticeSection(viewModel.notice)
+                    if !viewModel.notice.isEmpty {
+                        noticeSection(viewModel.notice)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 28)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .blur(radius: viewModel.loading ? 1.5 : 0)
+
+            if viewModel.loading {
+                syncOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
         }
-        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("复习")
-        .task { await viewModel.loadQueue() }
-        .refreshable { await viewModel.loadQueue() }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("刷新") { Task { await viewModel.loadQueue() } }
-            }
+        .task(id: isActive) {
+            guard isActive else { return }
+            await viewModel.loadQueue()
         }
     }
 
@@ -48,7 +50,7 @@ struct ReviewView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("今日队列")
                     .font(.headline)
-                Text("按卡片完成“会/不会”判定")
+                Text("按卡片完成“会/不会”判断")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -110,15 +112,11 @@ struct ReviewView: View {
     }
 
     private var actionBar: some View {
-        HStack(spacing: 10) {
-            Button("英文翻译") { viewModel.revealEnglish() }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .buttonStyle(.bordered)
-
-            Button("刷新队列") { Task { await viewModel.loadQueue() } }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .buttonStyle(.borderedProminent)
+        Button("英文翻译") {
+            viewModel.revealEnglish()
         }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .buttonStyle(.bordered)
     }
 
     private var emptyState: some View {
@@ -141,6 +139,29 @@ struct ReviewView: View {
         .frame(maxWidth: .infinity, minHeight: 240)
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var syncOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.14)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("正在同步数据")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        }
     }
 
     private func noticeSection(_ text: String) -> some View {
