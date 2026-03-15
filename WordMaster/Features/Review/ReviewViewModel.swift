@@ -8,6 +8,8 @@ final class ReviewViewModel: ObservableObject {
     @Published var showEnglish: Bool = false
     @Published var notice: String = ""
     @Published private(set) var loading = false
+    @Published private(set) var submittingReview = false
+    @Published private(set) var isTransitioningToNextCard = false
 
     private let context: AppContext
 
@@ -30,6 +32,8 @@ final class ReviewViewModel: ObservableObject {
             queue = []
             currentIndex = 0
             showEnglish = false
+            submittingReview = false
+            isTransitioningToNextCard = false
             notice = "请先登录"
             return
         }
@@ -41,44 +45,62 @@ final class ReviewViewModel: ObservableObject {
             queue = try await context.wordRepository.fetchDueWords(userId: userId, today: today)
             currentIndex = 0
             showEnglish = false
+            submittingReview = false
+            isTransitioningToNextCard = false
             notice = queue.isEmpty ? "今天没有需要复习的单词" : ""
         } catch {
+            submittingReview = false
+            isTransitioningToNextCard = false
             notice = "加载复习队列失败：\(error.localizedDescription)"
         }
     }
 
     func revealEnglish() {
+        guard !isTransitioningToNextCard else { return }
         showEnglish = true
     }
 
     func tapCard(today: Date = Date()) async {
+        guard !loading, !submittingReview, !isTransitioningToNextCard else { return }
         guard let current = currentWord, let userId = context.currentUserId else { return }
         let result: ReviewResult = showEnglish ? .unknown : .known
 
+        submittingReview = true
+        defer { submittingReview = false }
+
         do {
-            let updated = try await context.wordRepository.applyReview(
+            _ = try await context.wordRepository.applyReview(
                 userId: userId,
                 wordId: current.id,
                 result: result,
                 today: today,
                 scheduler: context.reviewScheduler
             )
-            queue[currentIndex] = updated
-            moveToNextCard()
+            prepareNextCardTransition()
         } catch {
             notice = "保存复习结果失败：\(error.localizedDescription)"
         }
     }
 
-    private func moveToNextCard() {
+    func completeCardTransition() {
+        guard isTransitioningToNextCard else { return }
+        currentIndex += 1
+        showEnglish = false
+        isTransitioningToNextCard = false
+    }
+
+    private func prepareNextCardTransition() {
         showEnglish = false
         let next = currentIndex + 1
-        if next < queue.count {
-            currentIndex = next
-        } else {
+
+        guard next < queue.count else {
             queue = []
             currentIndex = 0
+            isTransitioningToNextCard = false
             notice = "已完成今日复习队列"
+            return
         }
+
+        isTransitioningToNextCard = true
     }
 }

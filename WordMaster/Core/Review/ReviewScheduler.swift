@@ -1,6 +1,6 @@
 import Foundation
 
-enum ReviewResult {
+enum ReviewResult: Equatable {
     case known
     case unknown
 }
@@ -44,4 +44,3 @@ struct ReviewScheduler {
         calendar.date(byAdding: .day, value: days, to: date) ?? date
     }
 }
-
