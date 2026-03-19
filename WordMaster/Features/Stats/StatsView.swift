@@ -183,6 +183,7 @@ struct StatsView: View {
         }
     }
 
+    @MainActor
     private func loadWords() async {
         guard let userId = context.currentUserId else {
             notice = "请先登录"

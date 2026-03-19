@@ -27,11 +27,7 @@ struct LibraryView: View {
                     }
 
                     if viewModel.words.isEmpty, !viewModel.loading {
-                        ContentUnavailableView(
-                            "暂无词条",
-                            systemImage: "books.vertical",
-                            description: Text("请先到“添加”页录入单词")
-                        )
+                        libraryEmptyState
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                     } else {
@@ -151,6 +147,32 @@ struct LibraryView: View {
         }
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var libraryEmptyState: some View {
+        if #available(iOS 17.0, *) {
+            ContentUnavailableView(
+                "\u{6682}\u{65E0}\u{8BCD}\u{6761}",
+                systemImage: "books.vertical",
+                description: Text("\u{8BF7}\u{5148}\u{5230}\u{201C}\u{6DFB}\u{52A0}\u{201D}\u{9875}\u{5F55}\u{5165}\u{5355}\u{8BCD}")
+            )
+        } else {
+            VStack(spacing: 12) {
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("\u{6682}\u{65E0}\u{8BCD}\u{6761}")
+                    .font(.headline)
+                Text("\u{8BF7}\u{5148}\u{5230}\u{201C}\u{6DFB}\u{52A0}\u{201D}\u{9875}\u{5F55}\u{5165}\u{5355}\u{8BCD}")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
     }
 
     private func deletionDialog(for word: WordItem) -> some View {

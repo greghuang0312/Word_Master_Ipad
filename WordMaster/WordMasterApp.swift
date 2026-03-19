@@ -26,7 +26,7 @@ struct WordMasterApp: App {
                 await context.restoreSession()
                 router.setAuthenticated(context.isAuthenticated)
             }
-            .onChange(of: context.isAuthenticated) { _, isAuthenticated in
+            .onChangeCompat(of: context.isAuthenticated) { isAuthenticated in
                 router.setAuthenticated(isAuthenticated)
             }
         }

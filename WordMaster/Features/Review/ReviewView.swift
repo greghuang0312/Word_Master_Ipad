@@ -47,11 +47,11 @@ struct ReviewView: View {
             guard isActive else { return }
             await viewModel.loadQueue()
         }
-        .onChange(of: viewModel.isTransitioningToNextCard) {
-            guard viewModel.isTransitioningToNextCard else { return }
+        .onChangeCompat(of: viewModel.isTransitioningToNextCard) { isTransitioningToNextCard in
+            guard isTransitioningToNextCard else { return }
             Task { await playNextCardTransition() }
         }
-        .onChange(of: viewModel.currentWord?.id) {
+        .onChangeCompat(of: viewModel.currentWord?.id) { _ in
             guard !viewModel.isTransitioningToNextCard else { return }
             resetCardPresentation()
         }
